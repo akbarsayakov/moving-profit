@@ -1,103 +1,126 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { RevenueSection } from '@/components/revenue-section';
+import { ExpensesSection } from '@/components/expenses-section';
+import { ProfitSummaryComponent } from '@/components/profit-summary';
+import { CalculatorData } from '@/types/calculator';
+import { calculateProfitSummary } from '@/lib/calculations';
+import { saveCalculatorData, loadCalculatorData, getDefaultCalculatorData } from '@/lib/storage';
+import html2canvas from 'html2canvas';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [data, setData] = useState<CalculatorData>(getDefaultCalculatorData());
+  const [isLoaded, setIsLoaded] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    const loadedData = loadCalculatorData();
+    setData(loadedData);
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded) {
+      saveCalculatorData(data);
+    }
+  }, [data, isLoaded]);
+
+  const summary = calculateProfitSummary(data);
+
+  const handleDownload = async () => {
+    const element = document.getElementById('profit-summary-card');
+    if (!element) return;
+
+    try {
+      const canvas = await html2canvas(element, {
+        backgroundColor: 'white',
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        onclone: (clonedDoc) => {
+          // Force all elements to use RGB colors instead of lab functions
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            * { 
+              color: rgb(0, 0, 0) !important; 
+              background-color: rgb(255, 255, 255) !important;
+            }
+            .text-green-600 { color: rgb(22, 163, 74) !important; }
+            .text-red-600 { color: rgb(220, 38, 38) !important; }
+            .text-muted-foreground { color: rgb(115, 115, 115) !important; }
+            .border { border-color: rgb(229, 229, 229) !important; }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+      
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `moving-profit-summary-${timestamp}.png`;
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      }, 'image/png', 1.0);
+    } catch (error) {
+      console.error('Error generating PNG:', error);
+    }
+  };
+
+  if (!isLoaded) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-foreground mb-2">
+            Moving Company Profit Calculator
+          </h1>
+          <p className="text-muted-foreground">
+            Calculate your profit after all expenses with detailed breakdown
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <RevenueSection
+              jobDate={data.jobDate}
+              hoursWorked={data.hoursWorked}
+              hourlyRate={data.hourlyRate}
+              additionalCharges={data.additionalCharges}
+              onJobDateChange={(date) => setData(prev => ({ ...prev, jobDate: date }))}
+              onHoursWorkedChange={(hours) => setData(prev => ({ ...prev, hoursWorked: hours }))}
+              onHourlyRateChange={(rate) => setData(prev => ({ ...prev, hourlyRate: rate }))}
+              onAdditionalChargesChange={(charges) => setData(prev => ({ ...prev, additionalCharges: charges }))}
+            />
+            
+            <ExpensesSection
+              movers={data.movers}
+              additionalExpenses={data.additionalExpenses}
+              onMoversChange={(movers) => setData(prev => ({ ...prev, movers }))}
+              onAdditionalExpensesChange={(expenses) => setData(prev => ({ ...prev, additionalExpenses: expenses }))}
+            />
+          </div>
+          
+          <div>
+            <ProfitSummaryComponent
+              summary={summary}
+              data={data}
+              onDownload={handleDownload}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
